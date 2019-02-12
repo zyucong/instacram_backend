@@ -71,16 +71,26 @@ router.get('/user', async (req, res) => {
             'posts':post_array
         })
     }
-    // console.log('get /dummy/user');
     res.send();
 });
 
-router.put('/user', (req, res) => {
+router.put('/user', async (req, res) => {
     const email = req.body.email;
     const name = req.body.name;
     const password = req.body.password;
-    console.log('put /dummy/user');
-    res.send();
+    const u_id = '1';   // for dummy endpoint
+    const allowed_keys=['password','name','email'];
+    const valid_keys = Array.from(Object.keys(req.body)).filter(k => allowed_keys.includes(k));
+    if (valid_keys.length < 1) return res.send(400, "Expected at least one field to change");
+    if (valid_keys.includes('password') && req.body.password.trim() === '') {
+        return res.send(400, "Password cannot be empty");
+    }
+    let payload = {};
+    valid_keys.forEach(k => payload[k] = req.body[k]);
+    await User.update({id: u_id}, {
+        $set: payload
+    });
+    res.send(200, "Success");
 });
 
 router.get('/user/feed', (req, res) => {
