@@ -16,7 +16,7 @@ const User = mongoose.model('User', new mongoose.Schema({
     email: String,
     name: String,
     following: String,
-    followed_num: {type: Number, min: 0}
+    followed_num: {type: String}
 }));
 
 const Post = mongoose.model('Post', new mongoose.Schema({
@@ -81,16 +81,16 @@ router.put('/user', async (req, res) => {
     const u_id = '1';   // for dummy endpoint
     const allowed_keys=['password','name','email'];
     const valid_keys = Array.from(Object.keys(req.body)).filter(k => allowed_keys.includes(k));
-    if (valid_keys.length < 1) return res.send(400, "Expected at least one field to change");
+    if (valid_keys.length < 1) return res.status(400).send("Expected at least one field to change");
     if (valid_keys.includes('password') && req.body.password.trim() === '') {
-        return res.send(400, "Password cannot be empty");
+        return res.status(400).send("Password cannot be empty");
     }
     let payload = {};
     valid_keys.forEach(k => payload[k] = req.body[k]);
-    await User.update({id: u_id}, {
+    await User.updateOne({id: u_id}, {
         $set: payload
     });
-    res.send(200, "Success");
+    res.status(200).send("Success");
 });
 
 router.get('/user/feed', (req, res) => {
@@ -103,9 +103,34 @@ router.get('/user/feed', (req, res) => {
     res.send([p, n]);
 });
 
-router.put('/user/follow', (req, res) => {
-    const username = req.query.username;
-    res.send();
+router.put('/user/follow', async (req, res) => {
+    const to_follow_username = req.query.username;
+    if (!to_follow_username) return res.status(400).send("You must provide an username");
+    let to_follow = await User.find({username: to_follow_username});
+    to_follow = to_follow[0];
+    if (!to_follow) return res.status(404).send("User Not Found");
+    const u_id = '1';
+    const to_follow_id = to_follow.id;
+    if (to_follow_id === u_id) return res.status(400).send("Sorry, you can't follow yourself.");
+    let sender = await User.find({id: u_id});
+    let followed_num = parseInt(to_follow.followed_num) + 1;
+    sender = sender[0];
+    const follow_list = string_to_set(sender.following);
+    if (!follow_list.has(to_follow_id)) {
+        await User.updateOne({id: to_follow_id}, {
+            // $inc: {followed_num: 1}
+            $set: {followed_num: followed_num}
+        });
+    }
+    follow_list.add(to_follow_id);
+    // console.log(follow_list);
+    // console.log(set_to_string(follow_list));
+    await User.updateOne({id: u_id}, {
+        $set: {
+            following: set_to_string(follow_list)
+        }
+    })
+    res.send('Success');
 });
 
 router.put('/user/unfollow', (req, res) => {
@@ -163,6 +188,10 @@ function validateUserId(user) {
 function string_to_set(raw) {
     if (!raw) return new Set([]);
     return new Set(raw.split(','));
+}
+
+function set_to_string(set) {
+    return Array.from(set).join(',');
 }
 
 module.exports = router;
