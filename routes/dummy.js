@@ -105,7 +105,7 @@ router.get('/user/feed', (req, res) => {
 
 router.put('/user/follow', async (req, res) => {
     const to_follow_username = req.query.username;
-    if (!to_follow_username) return res.status(400).send("You must provide an username");
+    if (!to_follow_username) return res.status(400).send("Expected 'username' query parameter");
     let to_follow = await User.find({username: to_follow_username});
     to_follow = to_follow[0];
     if (!to_follow) return res.status(404).send("User Not Found");
@@ -113,10 +113,10 @@ router.put('/user/follow', async (req, res) => {
     const to_follow_id = to_follow.id;
     if (to_follow_id === u_id) return res.status(400).send("Sorry, you can't follow yourself.");
     let sender = await User.find({id: u_id});
-    let followed_num = parseInt(to_follow.followed_num) + 1;
     sender = sender[0];
     const follow_list = string_to_set(sender.following);
     if (!follow_list.has(to_follow_id)) {
+        let followed_num = parseInt(to_follow.followed_num) + 1;
         await User.updateOne({id: to_follow_id}, {
             // $inc: {followed_num: 1}
             $set: {followed_num: followed_num}
@@ -130,12 +130,34 @@ router.put('/user/follow', async (req, res) => {
             following: set_to_string(follow_list)
         }
     })
-    res.send('Success');
+    res.send("Success");
 });
 
-router.put('/user/unfollow', (req, res) => {
-    const username = req.query.username;
-    res.send();
+router.put('/user/unfollow', async (req, res) => {
+    const to_unfollow_username = req.query.username;
+    if (!to_unfollow_username) return res.status(400).send("Expected 'username' query parameter");
+    let to_unfollow = await User.find({username: to_unfollow_username});
+    to_unfollow = to_unfollow[0];
+    if (!to_unfollow) return res.status(404).send("User Not Found");
+    const to_unfollow_id = to_unfollow.id;
+    const u_id = '1';
+    if (to_unfollow_id === u_id) return res.status(400).send("Sorry, you can't follow yourself.");
+    let sender = await User.find({id: u_id});
+    sender = sender[0];
+    const follow_list = string_to_set(sender.following);
+    if (follow_list.has(to_unfollow_id)) {
+        let followed_num = parseInt(to_unfollow.followed_num) - 1;
+        await User.updateOne({id: to_unfollow_id}, {
+            $set: {followed_num: followed_num}
+        });
+    }
+    follow_list.delete(to_unfollow_id);
+    await User.updateOne({id: u_id}, {
+        $set: {
+            following: set_to_string(follow_list)
+        }
+    })
+    res.send("Success");
 });
 
 router.post('/post', (req, res) => {
