@@ -30,6 +30,13 @@ const Post = mongoose.model('Post', new mongoose.Schema({
     thumbnail: String
 }));
 
+const Comment = mongoose.model("Comment", new mongoose.Schema({
+    id: String,
+    author: String,
+    comment: String,
+    published: String
+}));
+
 router.get('/user', async (req, res) => {
     const username = req.query.username;
     const id = req.query.id;
@@ -93,14 +100,57 @@ router.put('/user', async (req, res) => {
     res.status(200).send("Success");
 });
 
-router.get('/user/feed', (req, res) => {
+router.get('/user/feed', async (req, res) => {
     let p = req.query.p;
     let n = req.query.n;
     // if (typeof p == undefined || p == null) p = 0;
     // if (typeof n == undefined || n == null) n = 10;
     if (!p) p = 0;
     if (!n) n = 10;
-    res.send([p, n]);
+    const u_id = "1";
+    let following = await User.find({id: u_id});
+    following = Array.from(string_to_set(following[0].following));
+    const users = await User.find({id: {$in: following}});
+    const usernames = [];
+    users.forEach(user => usernames.push(user.username));
+    const posts = await Post.find({author: {$in: usernames}}).select({src: 0, thumbnail: 0});
+    let formatted_posts = []
+    for (const post of posts) {
+        const comments = [];
+        const query = await Comment.find({id: {$in: post.comments}});
+        // console.log(query);
+        query.forEach(c => comments.push({
+            author: c.author,
+            published: c.published,
+            comment: c.comment
+        }));
+        // console.log(comments);
+        formatted_posts.push(    
+        {
+            id: post.id,
+            meta: {
+                author: post.author,
+                description_text: post.description,
+                published: post.published,
+                likes: Array.from(string_to_set(post.likes))
+                .map(l => parseInt(l))
+            },
+            // thumbnail: post.thumbnail,
+            // src: post.src,
+            comments: comments
+        });
+    };
+    formatted_posts.sort((a, b) => {
+        return parseFloat(b.meta.published) - parseFloat(a.meta.published);
+    });
+    if (p > formatted_posts.length - 1) {
+        formatted_posts = [];
+    } else {
+        formatted_posts = formatted_posts.slice(p, n);
+    }
+    return res.send({
+        posts: formatted_posts
+    });
 });
 
 router.put('/user/follow', async (req, res) => {
@@ -123,8 +173,6 @@ router.put('/user/follow', async (req, res) => {
         });
     }
     follow_list.add(to_follow_id);
-    // console.log(follow_list);
-    // console.log(set_to_string(follow_list));
     await User.updateOne({id: u_id}, {
         $set: {
             following: set_to_string(follow_list)
@@ -214,6 +262,28 @@ function string_to_set(raw) {
 
 function set_to_string(set) {
     return Array.from(set).join(',');
+}
+
+async function format_post(post) {
+    const comments = [];
+    const query = await Comment.find({id: {$in: post.comments}});
+    query.forEach(c => comments.push({
+        author: c.author,
+        published: c.published,
+        comment: c.comment
+    }));
+    return {
+        id: post.id,
+        meta: {
+            author: post.author,
+            description_text: post.description,
+            published: post.published,
+            likes: Array.from(string_to_set(post.likes))
+        },
+        // thumbnail: post.thumbnail,
+        // src: post.src,
+        comments: comments
+    }
 }
 
 module.exports = router;
