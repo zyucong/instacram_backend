@@ -1,23 +1,19 @@
 const express = require('express');
 const Joi = require('joi');
+const {User} = require('../models/user');
 const router = express.Router();
-
 const mongoose = require('mongoose');
 
-mongoose.connect('mongodb://localhost/instacram', { useNewUrlParser: true })
-.then(() => console.log('Connected to MongoDB'))
-.catch(err => console.error('Could not connect to MongoDB', err));
-
-const User = mongoose.model('User', new mongoose.Schema({
-    id: { 
-        type: String
-    },
-    username: String,
-    email: String,
-    name: String,
-    following: String,
-    followed_num: {type: String}
-}));
+// const User = mongoose.model('User', new mongoose.Schema({
+//     id: { 
+//         type: String
+//     },
+//     username: String,
+//     email: String,
+//     name: String,
+//     following: String,
+//     followed_num: {type: String}
+// }));
 
 const Post = mongoose.model('Post', new mongoose.Schema({
     id: String,
@@ -42,6 +38,7 @@ router.get('/user', async (req, res) => {
     const id = req.query.id;
     const {error} = validateUserId(req.query);
     if (error) return res.status(400).send("Malformed Request");
+    let u_id;
     if (username || id) {
         const idcnt = await User.find({id: id}).countDocuments();
         const usernamecnt = await User.find({username: username}).countDocuments();
@@ -54,30 +51,30 @@ router.get('/user', async (req, res) => {
                 return user[0].id;
             }
         }
-        const u_id = await idfunc();
-        let user = await User.find({id: u_id});
-        user = user[0];
-        const u_username = user.username;
-        const posts = await Post.find({author: u_username}).select({id: 1});
-        let post_array = [];
-        posts.forEach((e) => post_array.push(parseInt(e.id)));
-        const follow_list = string_to_set(user.following);
-        let follow_array = [];
-        follow_list.forEach(v => follow_array.push(parseInt(v)));
-        // [...follow_list]
-        console.log(user.followed_num);
-        res.send({
-            'username': u_username,
-            'name': user.name,
-            'id'  : parseInt(u_id),
-            'email': user.email,
-            // 'following': [...follow_list],
-            'following': follow_array,
-            // 'followed_num': parseInt(user.followed_num),
-            'followed_num': user.followed_num,
-            'posts':post_array
-        })
+        u_id = await idfunc();
     }
+    let user = await User.find({id: u_id});
+    user = user[0];
+    const u_username = user.username;
+    const posts = await Post.find({author: u_username}).select({id: 1});
+    let post_array = [];
+    posts.forEach((e) => post_array.push(parseInt(e.id)));
+    const follow_list = string_to_set(user.following);
+    let follow_array = [];
+    follow_list.forEach(v => follow_array.push(parseInt(v)));
+    // [...follow_list]
+    console.log(user.followed_num);
+    res.send({
+        'username': u_username,
+        'name': user.name,
+        'id'  : parseInt(u_id),
+        'email': user.email,
+        // 'following': [...follow_list],
+        'following': follow_array,
+        // 'followed_num': parseInt(user.followed_num),
+        'followed_num': user.followed_num,
+        'posts':post_array
+    });
     res.send();
 });
 
@@ -124,7 +121,6 @@ router.get('/user/feed', async (req, res) => {
             published: c.published,
             comment: c.comment
         }));
-        // console.log(comments);
         formatted_posts.push(    
         {
             id: post.id,
