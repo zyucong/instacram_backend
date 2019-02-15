@@ -37,12 +37,12 @@ router.get('/user', async (req, res) => {
     const username = req.query.username;
     const id = req.query.id;
     const {error} = validateUserId(req.query);
-    if (error) return res.status(400).send("Malformed Request");
+    if (error) return res.status(400).send({message: "Malformed Request"});
     let u_id;
     if (username || id) {
         const idcnt = await User.find({id: id}).countDocuments();
         const usernamecnt = await User.find({username: username}).countDocuments();
-        if (idcnt === 0 && usernamecnt === 0) return res.status(404).send("User Not Found");
+        if (idcnt === 0 && usernamecnt === 0) return res.status(404).send({message: "User Not Found"});
         const idfunc = async function(){
             if (idcnt) {
                 return id;
@@ -85,9 +85,9 @@ router.put('/user', async (req, res) => {
     const u_id = '1';   // for dummy endpoint
     const allowed_keys=['password','name','email'];
     const valid_keys = Array.from(Object.keys(req.body)).filter(k => allowed_keys.includes(k));
-    if (valid_keys.length < 1) return res.status(400).send("Expected at least one field to change");
+    if (valid_keys.length < 1) return res.status(400).send({message: "Expected at least one field to change"});
     if (valid_keys.includes('password') && req.body.password.trim() === '') {
-        return res.status(400).send("Password cannot be empty");
+        return res.status(400).send({message: "Password cannot be empty"});
     }
     let payload = {};
     valid_keys.forEach(k => payload[k] = req.body[k]);
@@ -151,13 +151,13 @@ router.get('/user/feed', async (req, res) => {
 
 router.put('/user/follow', async (req, res) => {
     const to_follow_username = req.query.username;
-    if (!to_follow_username) return res.status(400).send("Expected 'username' query parameter");
+    if (!to_follow_username) return res.status(400).send({message: "Expected 'username' query parameter"});
     let to_follow = await User.find({username: to_follow_username});
     to_follow = to_follow[0];
-    if (!to_follow) return res.status(404).send("User Not Found");
+    if (!to_follow) return res.status(404).send({message: "User Not Found"});
     const u_id = '1';
     const to_follow_id = to_follow.id;
-    if (to_follow_id === u_id) return res.status(400).send("Sorry, you can't follow yourself.");
+    if (to_follow_id === u_id) return res.status(400).send({message: "Sorry, you can't follow yourself."});
     let sender = await User.find({id: u_id});
     sender = sender[0];
     const follow_list = string_to_set(sender.following);
@@ -179,13 +179,13 @@ router.put('/user/follow', async (req, res) => {
 
 router.put('/user/unfollow', async (req, res) => {
     const to_unfollow_username = req.query.username;
-    if (!to_unfollow_username) return res.status(400).send("Expected 'username' query parameter");
+    if (!to_unfollow_username) return res.status(400).send({message: "Expected 'username' query parameter"});
     let to_unfollow = await User.find({username: to_unfollow_username});
     to_unfollow = to_unfollow[0];
-    if (!to_unfollow) return res.status(404).send("User Not Found");
+    if (!to_unfollow) return res.status(404).send({message: "User Not Found"});
     const to_unfollow_id = to_unfollow.id;
     const u_id = '1';
-    if (to_unfollow_id === u_id) return res.status(400).send("Sorry, you can't follow yourself.");
+    if (to_unfollow_id === u_id) return res.status(400).send({message: "Sorry, you can't unfollow yourself."});
     let sender = await User.find({id: u_id});
     sender = sender[0];
     const follow_list = string_to_set(sender.following);

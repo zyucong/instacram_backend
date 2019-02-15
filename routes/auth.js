@@ -9,20 +9,15 @@ const router = express.Router();
 router.post('/signup', async (req, res) => {
     const json = req.body;
     const not_found = ['username','password','email','name'];
-    // not_found = not_found.filter(e => !json[e]);
-    // if (not_found.length > 0) {
-    //     return res.status(400)
-    //     .send('Expected request object to contain: ' + not_found.join(','));
-    // }
     if (unpack(json, not_found)) {
         return res.status(400)
-        .send('Expected request object to contain: ' + unpack(json, not_found));
+        .send({message: 'Expected request object to contain: ' + unpack(json, not_found)});
     }
     if (!json.username || !json.password) {
-        return res.status(400).status('username and password cannot be empty');
+        return res.status(400).status({message: 'username and password cannot be empty'});
     }
     const check = await User.findOne({username: json.username});
-    if (check) return res.status(409).send('Username Taken');
+    if (check) return res.status(409).send({message: 'Username Taken'});
     const token = jwt.sign({
         username: json.username,
         name: json.name,
@@ -47,13 +42,15 @@ router.post('/login', async (req, res) => {
     const not_found = ['username', 'password']
     if (unpack(json, not_found)) {
         return res.status(400)
-        .send('Expected request object to contain: ' + unpack(json, not_found));
+        .send({message: 'Expected request object to contain: ' + unpack(json, not_found)});
     }
     if (!json.username || !json.password) {
-        return res.status(400).status('username and password cannot be empty');
+        return res.status(400).status({message: 'username and password cannot be empty'});
     }
     const check = await User.findOne({username: json.username, password: json.password});
-    if (!check) return res.status(403).send('Invalid Username/Password');
+    // if (!check) return res.status(403).send('Invalid Username/Password');
+    if (!check) return res.status(403).send({message: 'Invalid Username/Password'});
+
     const token = jwt.sign({
         username: json.username
     }, 'testSecret');
