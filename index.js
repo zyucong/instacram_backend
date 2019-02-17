@@ -17,4 +17,5 @@ app.use('/dummy', dummy);
 app.use('/auth', auth);
 app.use('/user', user);
 
-app.listen(5050, () => console.log('Backend is on'));
+const port = process.env.PORT || 5050;
+app.listen(port, () => console.log(`Listening on port ${port}...`));
