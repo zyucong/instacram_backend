@@ -1,75 +1,54 @@
 const express = require('express');
 const Joi = require('joi');
+const jwt = require('jsonwebtoken');
+const auth = require('../middleware/auth');
 const {User} = require('../models/user');
 const {Post} = require('../models/post');
 const {Comment} = require('../models/comment');
 const router = express.Router();
 const mongoose = require('mongoose');
+const {string_to_set, set_to_string, validateUserId, format_post} = require('../utils/globals');
 
-// const User = mongoose.model('User', new mongoose.Schema({
-//     id: { 
-//         type: String
-//     },
-//     username: String,
-//     email: String,
-//     name: String,
-//     following: String,
-//     followed_num: {type: String}
-// }));
-
-// const Post = mongoose.model('Post', new mongoose.Schema({
-//     id: String,
-//     author: String,
-//     comments: String,
-//     description: String,
-//     likes: String,
-//     published: String,
-//     src: String,
-//     thumbnail: String
-// }));
-
-// const Comment = mongoose.model("Comment", new mongoose.Schema({
-//     id: String,
-//     author: String,
-//     comment: String,
-//     published: String
-// }));
-
-router.get('/user', async (req, res) => {
+router.get('/', auth, async (req, res) => {
     const username = req.query.username;
     const id = req.query.id;
     const {error} = validateUserId(req.query);
     if (error) return res.status(400).send({message: "Malformed Request"});
-    let u_id;
+    // let u_id;
+    let u_name = req.username;
     if (username || id) {
         const idcnt = await User.find({id: id}).countDocuments();
         const usernamecnt = await User.find({username: username}).countDocuments();
         if (idcnt === 0 && usernamecnt === 0) return res.status(404).send({message: "User Not Found"});
         const idfunc = async function(){
             if (idcnt) {
-                return id;
+                // return id;
+                const user = await User.find({id: id});
+                return user[0].username;
             } else {
-                const user = await User.find({username: username});
-                return user[0].id;
+                return username
+                // const user = await User.find({username: username});
+                // return user[0].id;
             }
         }
-        u_id = await idfunc();
+        u_name = await idfunc();
     }
-    let user = await User.find({id: u_id});
+    // let user = await User.find({id: u_id});
+    let user = await User.find({username: u_name});
     user = user[0];
-    const u_username = user.username;
-    const posts = await Post.find({author: u_username}).select({id: 1});
+    // const u_username = user.username;
+    const posts = await Post.find({author: u_name}).select({id: 1});
     let post_array = [];
     posts.forEach((e) => post_array.push(parseInt(e.id)));
     const follow_list = string_to_set(user.following);
     let follow_array = [];
     follow_list.forEach(v => follow_array.push(parseInt(v)));
     // [...follow_list]
-    console.log(user.followed_num);
+    // console.log(user.followed_num);
     res.send({
-        'username': u_username,
+        'username': u_name,
         'name': user.name,
-        'id'  : parseInt(u_id),
+        'id'  : parseInt(user.id),
         'email': user.email,
         // 'following': [...follow_list],
         'following': follow_array,
@@ -77,14 +56,10 @@ router.get('/user', async (req, res) => {
         'followed_num': user.followed_num,
         'posts':post_array
     });
-    res.send();
 });
 
-router.put('/user', async (req, res) => {
-    const email = req.body.email;
-    const name = req.body.name;
-    const password = req.body.password;
-    const u_id = '1';   // for dummy endpoint
+router.put('/', auth, async (req, res) => {
+    const u_name = req.username;
     const allowed_keys=['password','name','email'];
     const valid_keys = Array.from(Object.keys(req.body)).filter(k => allowed_keys.includes(k));
     if (valid_keys.length < 1) return res.status(400).send({message: "Expected at least one field to change"});
@@ -93,26 +68,25 @@ router.put('/user', async (req, res) => {
     }
     let payload = {};
     valid_keys.forEach(k => payload[k] = req.body[k]);
-    await User.updateOne({id: u_id}, {
+    await User.updateOne({username: u_name}, {
         $set: payload
     });
     res.status(200).send("Success");
 });
 
-router.get('/user/feed', async (req, res) => {
+router.get('/feed', auth, async (req, res) => {
     let p = req.query.p;
     let n = req.query.n;
-    // if (typeof p == undefined || p == null) p = 0;
-    // if (typeof n == undefined || n == null) n = 10;
     if (!p) p = 0;
     if (!n) n = 10;
-    const u_id = "1";
-    let following = await User.find({id: u_id});
+    const u_name = req.username;
+    // let following = await User.find({id: u_id});
+    let following = await User.find({username: u_name});
     following = Array.from(string_to_set(following[0].following));
     const users = await User.find({id: {$in: following}});
     const usernames = [];
     users.forEach(user => usernames.push(user.username));
-    const posts = await Post.find({author: {$in: usernames}}).select({src: 0, thumbnail: 0});
+    const posts = await Post.find({author: {$in: usernames}});
     let formatted_posts = []
     for (const post of posts) {
         const comments = [];
@@ -133,8 +107,8 @@ router.get('/user/feed', async (req, res) => {
                 likes: Array.from(string_to_set(post.likes))
                 .map(l => parseInt(l))
             },
-            // thumbnail: post.thumbnail,
-            // src: post.src,
+            thumbnail: post.thumbnail,
+            src: post.src,
             comments: comments
         });
     };
@@ -151,16 +125,16 @@ router.get('/user/feed', async (req, res) => {
     });
 });
 
-router.put('/user/follow', async (req, res) => {
+router.put('/follow', auth, async (req, res) => {
     const to_follow_username = req.query.username;
     if (!to_follow_username) return res.status(400).send({message: "Expected 'username' query parameter"});
     let to_follow = await User.find({username: to_follow_username});
     to_follow = to_follow[0];
     if (!to_follow) return res.status(404).send({message: "User Not Found"});
-    const u_id = '1';
+    const u_name = req.username;
     const to_follow_id = to_follow.id;
-    if (to_follow_id === u_id) return res.status(400).send({message: "Sorry, you can't follow yourself."});
-    let sender = await User.find({id: u_id});
+    if (to_follow_username === u_name) return res.status(400).send({message: "Sorry, you can't follow yourself."});
+    let sender = await User.find({username: u_name});
     sender = sender[0];
     const follow_list = string_to_set(sender.following);
     if (!follow_list.has(to_follow_id)) {
@@ -171,7 +145,7 @@ router.put('/user/follow', async (req, res) => {
         });
     }
     follow_list.add(to_follow_id);
-    await User.updateOne({id: u_id}, {
+    await User.updateOne({username: u_name}, {
         $set: {
             following: set_to_string(follow_list)
         }
@@ -179,16 +153,16 @@ router.put('/user/follow', async (req, res) => {
     res.send("Success");
 });
 
-router.put('/user/unfollow', async (req, res) => {
+router.put('/unfollow', auth, async (req, res) => {
     const to_unfollow_username = req.query.username;
     if (!to_unfollow_username) return res.status(400).send({message: "Expected 'username' query parameter"});
     let to_unfollow = await User.find({username: to_unfollow_username});
     to_unfollow = to_unfollow[0];
     if (!to_unfollow) return res.status(404).send({message: "User Not Found"});
+    const u_name = req.username;
     const to_unfollow_id = to_unfollow.id;
-    const u_id = '1';
-    if (to_unfollow_id === u_id) return res.status(400).send({message: "Sorry, you can't unfollow yourself."});
-    let sender = await User.find({id: u_id});
+    if (to_unfollow_username === u_name) return res.status(400).send({message: "Sorry, you can't unfollow yourself."});
+    let sender = await User.find({username: u_name});
     sender = sender[0];
     const follow_list = string_to_set(sender.following);
     if (follow_list.has(to_unfollow_id)) {
@@ -198,90 +172,12 @@ router.put('/user/unfollow', async (req, res) => {
         });
     }
     follow_list.delete(to_unfollow_id);
-    await User.updateOne({id: u_id}, {
+    await User.updateOne({username: u_name}, {
         $set: {
             following: set_to_string(follow_list)
         }
     })
     res.send("Success");
 });
-
-router.post('/post', (req, res) => {
-    const description = req.body.description_text
-    const src = req.body.src;
-    res.send();
-});
-
-router.delete('/post', (req, res) => {
-    const id = req.query.id;
-    res.send();
-});
-
-router.get('/post', (req, res) => {
-    const id = req.query.id;
-    res.send();
-});
-
-router.put('/post', (req, res) => {
-    const description = req.body.description_text
-    const src = req.body.src;
-    res.send();
-});
-
-router.put('/post/comment', (req, res) => {
-    const author = req.body.author;
-    const time = req.body.published;
-    const comment = req.body.comment;
-    res.send();
-});
-
-router.put('/post/like', (req, res) => {
-    const id = req.query.id;
-    res.send();
-});
-
-router.put('/post/unlike', (req, res) => {
-    const id = req.query.id;
-    res.send();
-});
-
-function validateUserId(user) {
-    const schema = {
-        id: Joi.number().integer().min(0),
-        username: Joi.string()
-    }
-    return Joi.validate(user, schema);
-}
-
-function string_to_set(raw) {
-    if (!raw) return new Set([]);
-    return new Set(raw.split(','));
-}
-
-function set_to_string(set) {
-    return Array.from(set).join(',');
-}
-
-async function format_post(post) {
-    const comments = [];
-    const query = await Comment.find({id: {$in: post.comments}});
-    query.forEach(c => comments.push({
-        author: c.author,
-        published: c.published,
-        comment: c.comment
-    }));
-    return {
-        id: post.id,
-        meta: {
-            author: post.author,
-            description_text: post.description,
-            published: post.published,
-            likes: Array.from(string_to_set(post.likes))
-        },
-        // thumbnail: post.thumbnail,
-        // src: post.src,
-        comments: comments
-    }
-}
 
 module.exports = router;

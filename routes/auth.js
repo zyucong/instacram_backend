@@ -52,7 +52,8 @@ router.post('/login', async (req, res) => {
     if (!check) return res.status(403).send({message: 'Invalid Username/Password'});
 
     const token = jwt.sign({
-        username: json.username
+        username: json.username,
+        id: check.id
     }, 'testSecret');
     await User.update({username: json.username}, {
         $set: {
