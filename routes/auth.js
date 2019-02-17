@@ -55,7 +55,7 @@ router.post('/login', async (req, res) => {
         username: json.username,
         id: check.id
     }, 'testSecret');
-    await User.update({username: json.username}, {
+    await User.updateOne({username: json.username}, {
         $set: {
             curr_token: token
         }
