@@ -3,6 +3,7 @@ const Joi = require('joi');
 const {User} = require('../models/user');
 const {Post} = require('../models/post');
 const {Comment} = require('../models/comment');
+const { unpack } = require('../utils/globals');
 const router = express.Router();
 const mongoose = require('mongoose');
 
@@ -206,26 +207,72 @@ router.put('/user/unfollow', async (req, res) => {
     res.send("Success");
 });
 
-router.post('/post', (req, res) => {
+router.post('/post', async (req, res) => {
     const description = req.body.description_text
     const src = req.body.src;
-    res.send();
+    const u_name = 'Anon';
+    const json = req.body;
+    const not_found = ['description_text', 'src'];
+    if (unpack(json, not_found)) {
+        return res.status(400)
+        .send({message: 'Expected request object to contain: ' + unpack(json, not_found)});
+    }
+    const posts = await Post.find().select({id: 1});
+    let last_id = posts.sort((a, b) => {return b.id - a.id;})[0].id;
+    last_id = (parseInt(last_id) + 1).toString();
+    await Post.insertMany([{
+        id: last_id,
+        author: u_name,
+        description: description,
+        published: (new Date() / 1000).toString(),
+        likes: '',
+        src: src
+    }]);
+    res.send({
+        post_id: last_id
+    });
 });
 
-router.delete('/post', (req, res) => {
+router.delete('/post', async (req, res) => {
     const id = req.query.id;
-    res.send();
+    const u_name = 'Anon';
+    const post = await Post.findOne({id: id});
+    if (!post) return res.status(404).send('Post Not Found');
+    if (post.author !== u_name) return res.status(403).send('You Are Unauthorized To Make That Request');
+    const comment_list = string_to_set(post.comments);
+    comment_list.forEach(async (e) => {
+        await Comment.deleteOne({id: e})
+    });
+    await Post.deleteOne({id: id});
+    res.send({
+        message: 'success'
+    });
 });
 
-router.get('/post', (req, res) => {
+router.get('/post', async (req, res) => {
     const id = req.query.id;
-    res.send();
+    const post = await Post.findOne({id: id});
+    if (!post) return res.status(404).send('Post Not Found');
+    const formatted_post = await format_post(post);
+    res.send(formatted_post);
 });
 
-router.put('/post', (req, res) => {
+router.put('/post', async (req, res) => {
     const description = req.body.description_text
     const src = req.body.src;
-    res.send();
+    const id = req.query.id;
+    if (!id) return res.status(400).send('Must supply a post id');
+    if (!description && !src) return res.status(400).send("Expected at least 'description_text' or 'src'");
+    const u_name = 'Anon';
+    const json = req.body;
+    const post = await Post.findOne({id: id});
+    if (!post) return res.status(404).send('Post Not Found');
+    if (post.author !== u_name) return res.status(403).send('You Are Unauthorized To Edit That Post');
+    let updated = {};
+    if (description) updated.description = description;
+    if (src) updated.src = src;
+    await Post.updateOne({id: id}, {$set: updated});
+    res.send({ message: 'success' });
 });
 
 router.put('/post/comment', (req, res) => {
@@ -264,7 +311,7 @@ function set_to_string(set) {
 
 async function format_post(post) {
     const comments = [];
-    const query = await Comment.find({id: {$in: post.comments}});
+    const query = await Comment.find({id: {$in: post.comments.split(',')}});
     query.forEach(c => comments.push({
         author: c.author,
         published: c.published,

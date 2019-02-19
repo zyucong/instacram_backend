@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const Joi = require('joi');
 const {User} = require('../models/user');
+const {unpack} = require('../utils/globals');
 const mongoose = require('mongoose');
 const express = require('express');
 const router = express.Router();
@@ -63,12 +64,12 @@ router.post('/login', async (req, res) => {
     res.send({token: token});
 });
 
-function unpack(json, not_found) {
-    const result = not_found.filter(e => !json[e]);
-    if (result.length > 0) {
-        return result.join(',');
-    }
-    return false;
-}
+// function unpack(json, not_found) {
+//     const result = not_found.filter(e => !json[e]);
+//     if (result.length > 0) {
+//         return result.join(',');
+//     }
+//     return false;
+// }
 
 module.exports = router;

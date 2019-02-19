@@ -40,9 +40,18 @@ async function format_post(post) {
     }
 }
 
+function unpack(json, not_found) {
+    const result = not_found.filter(e => !json[e]);
+    if (result.length > 0) {
+        return result.join(',');
+    }
+    return false;
+}
+
 module.exports = {
     string_to_set,
     set_to_string,
     validateUserId,
-    format_post
+    format_post,
+    unpack
 }
