@@ -13,7 +13,7 @@ For some reason it is painfully slow but it does work. Maybe that's because I pu
 Well there are a bunch of things that I need to work on it to make it better. The most important issue comes first.
 
 * Implement /post endpoint, currently I have only done the /auth (to login, signup), and /user endpoint.
-* To remove token stored in the database. It is dangerous and not necessary to keep them there.
+* Remove token stored in the database. It is dangerous and not necessary to keep them there. Remove thumbnail stored in the database, it is tedious to convert the data urls to smaller size images. And it is not being used by the frontend.
 * Implement some testing. It is seldom mentioned in university but it is important in industry. Discard the tedious console.log() for something real. The backend logic has been tested to be workable as an assignment so I don't need to worry about it when I built it. But I still need some testing.
 * Add SSL to the webpage. Firefox gives me warning when I tried to enter password to login :(
 * Host the frontend somewhere else closer to where the backend is deployed. To see why the delay exists and how to eliminate it.
