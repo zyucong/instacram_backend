@@ -275,21 +275,65 @@ router.put('/post', async (req, res) => {
     res.send({ message: 'success' });
 });
 
-router.put('/post/comment', (req, res) => {
+router.put('/post/comment', async (req, res) => {
     const author = req.body.author;
     const time = req.body.published;
     const comment = req.body.comment;
-    res.send();
+    const json = req.body;
+    const id = req.query.id;
+    const not_found = ['author', 'published', 'comment'];
+    if (unpack(json, not_found)) {
+        return res.status(400)
+        .send({message: 'Expected request object to contain: ' + unpack(json, not_found)});
+    }
+    const post = await Post.findOne({id: id});
+    if (!post) return res.status(404).send('Post Not Found');
+    const comments = await Comment.find().select({id: 1});
+    let comment_id = comments.sort((a, b) => {return b.id - a.id;})[0].id;
+    comment_id = (parseInt(comment_id) + 1).toString();
+    await Comment.insertMany([{
+        id: comment_id,
+        comment: comment,
+        author: author,
+        published: time
+    }]);
+    let comment_list = string_to_set(post.comments);
+    comment_list.add(comment_id);
+    comment_list = set_to_string(comment_list);
+    await Post.updateOne({id: id}, {$set: {
+        comments: comment_list
+    }});
+    res.send({ message: 'success' });
 });
 
-router.put('/post/like', (req, res) => {
+router.put('/post/like', async (req, res) => {
     const id = req.query.id;
-    res.send();
+    if (!id) return res.status(400).send('Must supply a post id');
+    const u_name = 'Anon';
+    const post = await Post.findOne({id: id});
+    if (!post) return res.status(404).send('Post Not Found');
+    const user = await User.findOne({username: u_name});
+    const u_id = user.id;
+    let likes = string_to_set(post.likes);
+    likes.add(u_id);
+    likes = set_to_string(likes);
+    await Post.updateOne({id: id}, {$set: {likes: likes}});
+    res.send({ message: 'success' });
 });
 
-router.put('/post/unlike', (req, res) => {
+router.put('/post/unlike', async (req, res) => {
     const id = req.query.id;
-    res.send();
+    if (!id) return res.status(400).send('Must supply a post id');
+    const u_name = 'Anon';
+    const post = await Post.findOne({id: id});
+    if (!post) return res.status(404).send('Post Not Found');
+    const user = await User.findOne({username: u_name});
+    const u_id = user.id;
+    let likes = string_to_set(post.likes);
+    likes.delete(u_id);
+    likes = set_to_string(likes);
+    await Post.updateOne({id: id}, {$set: {likes: likes}});  
+    res.send({ message: 'success'} );
 });
 
 function validateUserId(user) {
