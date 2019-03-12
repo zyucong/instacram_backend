@@ -9,6 +9,7 @@ const router = express.Router();
 const mongoose = require('mongoose');
 const {string_to_set, set_to_string, validateUserId, format_post} = require('../utils/globals');
 
+// gets the information of supplied user
 router.get('/', auth, async (req, res) => {
     const username = req.query.username;
     const id = req.query.id;
@@ -53,11 +54,12 @@ router.get('/', auth, async (req, res) => {
         // 'following': [...follow_list],
         'following': follow_array,
         // 'followed_num': parseInt(user.followed_num),
-        'followed_num': user.followed_num,
+        'followed_num': parseInt(user.followed_num),
         'posts':post_array
     });
 });
 
+// updates the user profile
 router.put('/', auth, async (req, res) => {
     const u_name = req.username;
     const allowed_keys=['password','name','email'];
@@ -90,7 +92,16 @@ router.get('/feed', auth, async (req, res) => {
     let formatted_posts = []
     for (const post of posts) {
         const comments = [];
-        const query = await Comment.find({id: {$in: post.comments}});
+        // console.log(post.comments);
+        let post_comments = post.comments;
+        post_comments = string_to_set(post_comments);
+        let new_comments = [];
+        // console.log(post_comments);
+        post_comments.forEach(p => new_comments.push(parseInt(p)));
+        // console.log(new_comments);
+        // post.comments = new_comments.join(',');
+        // console.log(post.comments);
+        const query = await Comment.find({id: {$in: new_comments}});
         // console.log(query);
         query.forEach(c => comments.push({
             author: c.author,
@@ -99,7 +110,7 @@ router.get('/feed', auth, async (req, res) => {
         }));
         formatted_posts.push(    
         {
-            id: post.id,
+            id: parseInt(post.id),
             meta: {
                 author: post.author,
                 description_text: post.description,
@@ -111,6 +122,8 @@ router.get('/feed', auth, async (req, res) => {
             src: post.src,
             comments: comments
         });
+        // console.log(Array.from(string_to_set(post.likes))
+        // .map(l => parseInt(l)));
     };
     formatted_posts.sort((a, b) => {
         return parseFloat(b.meta.published) - parseFloat(a.meta.published);
@@ -125,6 +138,7 @@ router.get('/feed', auth, async (req, res) => {
     });
 });
 
+// follow other user
 router.put('/follow', auth, async (req, res) => {
     const to_follow_username = req.query.username;
     if (!to_follow_username) return res.status(400).send({message: "Expected 'username' query parameter"});
@@ -153,6 +167,7 @@ router.put('/follow', auth, async (req, res) => {
     res.send("Success");
 });
 
+// unfollow other user
 router.put('/unfollow', auth, async (req, res) => {
     const to_unfollow_username = req.query.username;
     if (!to_unfollow_username) return res.status(400).send({message: "Expected 'username' query parameter"});

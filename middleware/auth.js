@@ -8,6 +8,7 @@ module.exports = function(req, res, next) {
     } catch(ex) {
         res.status(400).send("Authorization Token must start with 'Token'");
     }
+    // console.log(token);
     try {
         const decoded = jwt.verify(token, 'testSecret');
         req.username = decoded.username;

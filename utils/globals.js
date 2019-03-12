@@ -20,22 +20,23 @@ function validateUserId(user) {
 
 async function format_post(post) {
     const comments = [];
-    const query = await Comment.find({id: {$in: post.comments}});
+    const comment_ids = string_to_set(post.comments);
+    const query = await Comment.find({id: {$in: Array.from(comment_ids)}});
     query.forEach(c => comments.push({
         author: c.author,
         published: c.published,
         comment: c.comment
     }));
     return {
-        id: post.id,
+        id: parseInt(post.id),
         meta: {
             author: post.author,
             description_text: post.description,
             published: post.published,
-            likes: Array.from(string_to_set(post.likes))
+            likes: Array.from(string_to_set(post.likes)).map(l => parseInt(l))
         },
-        // thumbnail: post.thumbnail,
-        // src: post.src,
+        thumbnail: post.thumbnail,
+        src: post.src,
         comments: comments
     }
 }

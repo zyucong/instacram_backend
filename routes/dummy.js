@@ -276,16 +276,10 @@ router.put('/post', async (req, res) => {
 });
 
 router.put('/post/comment', async (req, res) => {
-    const author = req.body.author;
-    const time = req.body.published;
     const comment = req.body.comment;
-    const json = req.body;
+    const u_name = 'Anon';
     const id = req.query.id;
-    const not_found = ['author', 'published', 'comment'];
-    if (unpack(json, not_found)) {
-        return res.status(400)
-        .send({message: 'Expected request object to contain: ' + unpack(json, not_found)});
-    }
+    if (!comment) return res.status(400).send('Comment cannot be empty');
     const post = await Post.findOne({id: id});
     if (!post) return res.status(404).send('Post Not Found');
     const comments = await Comment.find().select({id: 1});
@@ -294,8 +288,8 @@ router.put('/post/comment', async (req, res) => {
     await Comment.insertMany([{
         id: comment_id,
         comment: comment,
-        author: author,
-        published: time
+        author: u_name,
+        published: (new Date() / 1000).toString()
     }]);
     let comment_list = string_to_set(post.comments);
     comment_list.add(comment_id);
